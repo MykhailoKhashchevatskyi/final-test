@@ -1,0 +1,629 @@
+import { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "motion/react";
+import {
+  Gem,
+  Sparkles,
+  Compass,
+  Info,
+  Calendar,
+  Lock,
+  ChevronRight,
+  BookOpen,
+  VolumeX,
+  Volume2,
+  X,
+  CreditCard,
+  CheckCircle,
+} from "lucide-react";
+import { SavedProfile, PredictionItem } from "./types";
+import { MOOD_QUOTES, DAILY_PREDICTIONS } from "./data/numerologyDb";
+
+// Components
+import Header from "./components/Header";
+import NumerologyDashboard from "./components/NumerologyDashboard";
+import CompatibilityCalculator from "./components/CompatibilityCalculator";
+import CrystalSanctuary from "./components/CrystalSanctuary";
+import CoinOfDestiny from "./components/CoinOfDestiny";
+import UserProfile from "./components/UserProfile";
+
+export default function App() {
+  // 1. Core user states with localStorage fallback
+  const [crystals, setCrystals] = useState<number>(() => {
+    const cached = localStorage.getItem("numerology_crystals");
+    return cached ? parseInt(cached, 10) : 49; // start with 49 crystals for new users
+  });
+
+  const [savedProfiles, setSavedProfiles] = useState<SavedProfile[]>(() => {
+    const cached = localStorage.getItem("numerology_saved_profiles");
+    if (cached) return JSON.parse(cached);
+    // Seed with beautiful historic examples!
+    return [
+      {
+        id: "vinci",
+        name: "Леонардо да Вінчі",
+        birthDate: "1452-04-15",
+        createdAt: Date.now(),
+      },
+      {
+        id: "einstein",
+        name: "Альберт Ейнштейн",
+        birthDate: "1879-03-14",
+        createdAt: Date.now() + 1,
+      },
+    ];
+  });
+
+  const [unlockedFeatures, setUnlockedFeatures] = useState<string[]>(() => {
+    const cached = localStorage.getItem("numerology_unlocked_features");
+    return cached ? JSON.parse(cached) : [];
+  });
+
+  const [predictionsHistory, setPredictionsHistory] = useState<PredictionItem[]>(() => {
+    const cached = localStorage.getItem("numerology_predictions_history");
+    return cached ? JSON.parse(cached) : [];
+  });
+
+  const [dailyClaimedAt, setDailyClaimedAt] = useState<string | null>(() => {
+    return localStorage.getItem("numerology_daily_claimed_at");
+  });
+
+  // Profile auth state
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => {
+    return localStorage.getItem("aetheris_logged_in") === "true";
+  });
+
+  // Lifed name & date states for active dashboard calculation
+  const [activeName, setActiveName] = useState<string>("Гість");
+  const [activeBirthDate, setActiveBirthDate] = useState<string>("1995-06-14");
+
+  // Crystal shop variables
+  const [showStoreModal, setShowStoreModal] = useState(false);
+  const [selectedPack, setSelectedPack] = useState<any | null>(null);
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [paymentSuccess, setPaymentSuccess] = useState(false);
+  const [paymentStep, setPaymentStep] = useState(0);
+
+  const paymentPhrases = [
+    "Ініціалізація зв'язку з ефірною системою...",
+    "Опрацювання уявного кристалічного контракту...",
+    "Акумуляція космічної транзакції...",
+    "Герметизація балансу сили..."
+  ];
+
+  // 2. Active Tab State
+  const [currentTab, setCurrentTab] = useState<string>("chart");
+
+  // 3. Toasts/Notifications State
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [toastType, setToastType] = useState<"success" | "info" | "error">("success");
+
+  // 4. Quote of the Day
+  const [quoteOfTheDay, setQuoteOfTheDay] = useState("");
+
+  // Set the quote of the day on mount
+  useEffect(() => {
+    const day = new Date().getDate();
+    const index = day % MOOD_QUOTES.length;
+    setQuoteOfTheDay(MOOD_QUOTES[index]);
+  }, []);
+
+  // Save states back to localStorage when changed
+  useEffect(() => {
+    localStorage.setItem("numerology_crystals", crystals.toString());
+  }, [crystals]);
+
+  useEffect(() => {
+    localStorage.setItem("numerology_saved_profiles", JSON.stringify(savedProfiles));
+  }, [savedProfiles]);
+
+  useEffect(() => {
+    localStorage.setItem("numerology_unlocked_features", JSON.stringify(unlockedFeatures));
+  }, [unlockedFeatures]);
+
+  useEffect(() => {
+    localStorage.setItem("numerology_predictions_history", JSON.stringify(predictionsHistory));
+  }, [predictionsHistory]);
+
+  // Check if daily claim button should be shown (once per calendar day)
+  const todayStr = new Date().toISOString().split("T")[0];
+  const isDailyClaimable = dailyClaimedAt !== todayStr;
+
+  // Trigger floating alert
+  const showToast = (msg: string, type: "success" | "info" | "error" = "success") => {
+    setToastMessage(msg);
+    setToastType(type);
+    setTimeout(() => {
+      setToastMessage(null);
+    }, 4500);
+  };
+
+  // Route guarding for non-logged-in users
+  const handleTabChange = (tab: string) => {
+    if (!isLoggedIn && tab !== "chart" && tab !== "profile") {
+      showToast("Увійдіть у профіль або зареєструйтесь, щоб розблокувати цю функцію ✧", "info");
+      setCurrentTab("profile");
+    } else {
+      setCurrentTab(tab);
+    }
+  };
+
+  useEffect(() => {
+    if (!isLoggedIn && currentTab !== "chart" && currentTab !== "profile") {
+      setCurrentTab("chart");
+    }
+  }, [isLoggedIn, currentTab]);
+
+  // 5. Crystal operations
+  const handleClaimDaily = () => {
+    if (!isDailyClaimable) return;
+    setCrystals((prev) => prev + 20);
+    setDailyClaimedAt(todayStr);
+    localStorage.setItem("numerology_daily_claimed_at", todayStr);
+    showToast("Отримано Щоденний Дар! +20 Кристалів 💎", "success");
+  };
+
+  const handleAddCrystals = (amount: number) => {
+    setCrystals((prev) => prev + amount);
+    showToast(`Енергія заряджена! +${amount} Кристалів 💎`, "success");
+  };
+
+  const handleUnlockFeature = (featureId: string, cost: number): boolean => {
+    if (unlockedFeatures.includes(featureId)) {
+      return true; // already unlocked
+    }
+    if (crystals < cost) {
+      showToast("Недостатньо Кристалів! Зарядіть їх в Оселі Кристалів 💎", "error");
+      return false;
+    }
+    setCrystals((prev) => prev - cost);
+    setUnlockedFeatures((prev) => [...prev, featureId]);
+    showToast(`Розблоковано нову таємницю! -${cost} Кристалів 💎`, "info");
+    return true;
+  };
+
+  // Profile operations
+  const handleSaveProfile = (name: string, date: string) => {
+    const isExist = savedProfiles.find((p) => p.name.toLowerCase() === name.toLowerCase());
+    if (isExist) {
+      showToast("Профіль з такою назвою вже збережено", "error");
+      return;
+    }
+    const newProf: SavedProfile = {
+      id: Date.now().toString(),
+      name,
+      birthDate: date,
+      createdAt: Date.now(),
+    };
+    setSavedProfiles((prev) => [newProf, ...prev]);
+    showToast(`Профіль "${name}" успішно збережено! ✧`, "success");
+  };
+
+  const handleDeleteProfile = (id: string) => {
+    const deleted = savedProfiles.find((p) => p.id === id);
+    setSavedProfiles((prev) => prev.filter((p) => p.id !== id));
+    if (deleted) {
+      showToast(`Профіль "${deleted.name}" видалено`, "info");
+    }
+  };
+
+  // Prediction operations
+  const handleSavePrediction = (type: "coin" | "compatibility", title: string, details: string) => {
+    const newItem: PredictionItem = {
+      id: Date.now().toString() + "_" + Math.random().toString(36).substring(2, 7),
+      type,
+      title,
+      details,
+      createdAt: Date.now(),
+    };
+    setPredictionsHistory((prev) => [newItem, ...prev]);
+  };
+
+  const handleDeletePrediction = (id: string) => {
+    setPredictionsHistory((prev) => prev.filter((p) => p.id !== id));
+  };
+
+  // Daily Prediction state inside App to leverage under premium unlock
+  const dailyForecastKey = `daily-forecast-${todayStr}`;
+  const isDailyForecastUnlocked = unlockedFeatures.includes(dailyForecastKey);
+
+  const handleUnlockDailyForecast = () => {
+    handleUnlockFeature(dailyForecastKey, 10);
+  };
+
+  const currentPredictionIndex = new Date().getDate() % DAILY_PREDICTIONS.length;
+  const currentPredictionText = DAILY_PREDICTIONS[currentPredictionIndex];
+
+  return (
+    <div className="relative min-h-screen bg-[#08080a] text-[#e2e2e7] overflow-x-hidden pb-12">
+      {/* 1. Magical Background elements */}
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_var(--tw-gradient-stops))] from-purple-950/20 via-[#08080a] to-[#08080a] pointer-events-none -z-10" />
+      
+      {/* Delicate floating particles in bg */}
+      <div className="absolute top-24 left-12 w-3.5 h-3.5 bg-purple-500/5 rounded-full blur-xs animate-pulse pointer-events-none" />
+      <div className="absolute top-1/2 right-24 w-6 h-6 bg-indigo-500/5 rounded-full blur-lg animate-pulse duration-5000 pointer-events-none" />
+
+      {/* Floating alert/toast notifications */}
+      <AnimatePresence>
+        {toastMessage && (
+          <motion.div
+            initial={{ opacity: 0, y: -50, x: "-50%" }}
+            animate={{ opacity: 1, y: 0, x: "-50%" }}
+            exit={{ opacity: 0, y: -20, x: "-50%" }}
+            className={`fixed top-6 left-1/2 -translate-x-1/2 px-5 py-3 rounded-full border text-xs sm:text-sm font-semibold shadow-2xl flex items-center gap-3 z-50 pointer-events-none ${
+              toastType === "success"
+                ? "bg-[#08080a]/90 border-emerald-500/40 text-emerald-100"
+                : toastType === "error"
+                ? "bg-[#08080a]/90 border-red-500/40 text-red-100"
+                : "bg-[#08080a]/90 border-purple-500/40 text-purple-100"
+            }`}
+          >
+            <div className="crystal-shape crystal-glow scale-75 shrink-0" />
+            <span>{toastMessage}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 2. Header */}
+      <Header
+        currentTab={currentTab}
+        setCurrentTab={handleTabChange}
+        crystals={crystals}
+        onClaimDaily={handleClaimDaily}
+        dailyClaimable={isDailyClaimable}
+        onOpenStore={() => setShowStoreModal(true)}
+        isLoggedIn={isLoggedIn}
+      />
+
+      {/* 3. Main Stage Content */}
+      <main className="max-w-7xl mx-auto px-4 mt-6 sm:px-6 space-y-6">
+        {/* Quote of the Day banner */}
+        <div id="quote-banner" className="text-center py-3 px-6 rounded-2xl sm:rounded-full glass border-white/5 max-w-3xl mx-auto">
+          <p className="font-display italic text-sm text-[#e2e2e7]/80 leading-relaxed font-light">
+            &ldquo;{quoteOfTheDay}&rdquo;
+          </p>
+        </div>
+
+        {/* Tab view routing */}
+        <AnimatePresence mode="wait">
+          {currentTab === "chart" && (
+            <motion.div
+              key="chart"
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -15 }}
+              className="space-y-6"
+            >
+              {/* Daily Cosmic Advisory Premium block */}
+              <div id="daily-cosmic-oracle-card" className="p-6 rounded-3xl glass border-white/5 relative overflow-hidden flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-12 h-12 rounded-full glass border-white/10 flex items-center justify-center text-purple-300 shrink-0">
+                    <Sparkles className="w-5 h-5 animate-pulse" />
+                  </div>
+                  <div>
+                    <h3 className="font-display text-lg font-light tracking-wide text-[#e2e2e7]">Космічне Передбачення на Сьогодні</h3>
+                    <p className="text-xs text-purple-300/60 font-sans mt-0.5">Отримайте інтуїтивний орієнтир для планування своїх справ за 10 💎</p>
+                  </div>
+                </div>
+
+                {!isDailyForecastUnlocked ? (
+                  <button
+                    id="unlock-oracle-btn"
+                    onClick={handleUnlockDailyForecast}
+                    className="px-5 py-2.5 rounded-xl bg-purple-500/20 border border-purple-500/40 hover:bg-purple-500/30 text-purple-200 uppercase text-[10px] tracking-widest cursor-pointer mt-2 sm:mt-0"
+                  >
+                    <span>Відкрити за 10 💎</span>
+                  </button>
+                ) : (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="flex-1 text-[#e2e2e7]/80 text-xs sm:text-sm italic pl-0 sm:pl-6 border-t sm:border-t-0 sm:border-l border-white/5 pt-3 sm:pt-0 font-display leading-relaxed"
+                  >
+                    &ldquo;{currentPredictionText}&rdquo;
+                  </motion.div>
+                )}
+              </div>
+
+              {/* Central Numerology Dashboard */}
+              <NumerologyDashboard
+                crystals={crystals}
+                unlockedFeatures={unlockedFeatures}
+                onUnlockFeature={handleUnlockFeature}
+                savedProfiles={savedProfiles}
+                onSaveProfile={handleSaveProfile}
+                onDeleteProfile={handleDeleteProfile}
+                activeName={activeName}
+                setActiveName={setActiveName}
+                activeBirthDate={activeBirthDate}
+                setActiveBirthDate={setActiveBirthDate}
+                isLoggedIn={isLoggedIn}
+                onGoToProfile={() => setCurrentTab("profile")}
+              />
+            </motion.div>
+          )}
+
+          {currentTab === "compatibility" && (
+            <motion.div
+              key="compatibility"
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -15 }}
+            >
+              <CompatibilityCalculator
+                crystals={crystals}
+                unlockedFeatures={unlockedFeatures}
+                onUnlockFeature={handleUnlockFeature}
+                onSaveAction={handleSavePrediction}
+              />
+            </motion.div>
+          )}
+
+          {currentTab === "sanctuary" && (
+            <motion.div
+              key="sanctuary"
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -15 }}
+            >
+              <CrystalSanctuary
+                crystals={crystals}
+                onAddCrystals={handleAddCrystals}
+              />
+            </motion.div>
+          )}
+
+          {currentTab === "coin" && (
+            <motion.div
+              key="coin"
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -15 }}
+            >
+              <CoinOfDestiny
+                crystals={crystals}
+                onUnlockFeature={handleUnlockFeature}
+                onSaveAction={handleSavePrediction}
+              />
+            </motion.div>
+          )}
+
+          {currentTab === "profile" && (
+            <motion.div
+              key="profile"
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -15 }}
+            >
+              <UserProfile
+                crystals={crystals}
+                savedProfiles={savedProfiles}
+                onLoadProfile={(prof) => {
+                  setActiveName(prof.name);
+                  setActiveBirthDate(prof.birthDate);
+                  setCurrentTab("chart");
+                  showToast(`Завантажено профіль "${prof.name}" ✧`, "success");
+                  setTimeout(() => {
+                    document.getElementById("right-chart-column")?.scrollIntoView({
+                      behavior: "smooth",
+                      block: "start",
+                    });
+                  }, 200);
+                }}
+                onDeleteProfile={handleDeleteProfile}
+                isLoggedIn={isLoggedIn}
+                setIsLoggedIn={setIsLoggedIn}
+                predictionsHistory={predictionsHistory}
+                onDeletePrediction={handleDeletePrediction}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </main>
+
+      {/* 4. Minimalist Elegant Footer */}
+      <footer className="mt-20 border-t border-white/5 py-8 px-4 text-center text-xs text-purple-300/30">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 font-mono">
+          <div className="flex items-center gap-2">
+            <div className="crystal-shape scale-50 opacity-40" />
+            <span>© {new Date().getFullYear()} AETHERIS. ВСІ ПРАВА ЗАХИЩЕНІ.</span>
+          </div>
+          <div className="flex items-center gap-4 text-[10px] tracking-widest uppercase text-purple-300/40">
+            <span>ЕФІРНІ ВІБРАЦІЇ: СИНХРОНІЗОВАНО</span>
+            <span className="hidden sm:inline">•</span>
+            <span>КРИСТАЛИ: АКТИВНІ</span>
+          </div>
+        </div>
+      </footer>
+
+      {/* 5. Mystical Crystal Store Purchase Modal */}
+      <AnimatePresence>
+        {showStoreModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-4 overflow-y-auto"
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="w-full max-w-lg bg-[#0e0e12]/95 border border-white/10 rounded-3xl p-6 sm:p-8 relative shadow-2xl"
+            >
+              {/* Close Button */}
+              <button
+                onClick={() => {
+                  if (!isProcessingPayment) {
+                    setShowStoreModal(false);
+                    setPaymentSuccess(false);
+                    setSelectedPack(null);
+                  }
+                }}
+                className={`absolute top-5 right-5 p-2 rounded-xl border border-white/5 bg-white/[0.02] text-white/50 hover:text-white hover:bg-white/10 transition-all cursor-pointer ${
+                  isProcessingPayment ? "opacity-30 pointer-events-none" : ""
+                }`}
+              >
+                <X className="w-4 h-4" />
+              </button>
+
+              <AnimatePresence mode="wait">
+                {isProcessingPayment ? (
+                  // PAYMENT LOADING SCREEN
+                  <motion.div
+                    key="payment-loading"
+                    initial={{ opacity: 0, scale: 0.97 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.97 }}
+                    className="py-12 flex flex-col items-center text-center space-y-6"
+                  >
+                    <div className="relative">
+                      {/* Dual animated glowing orbits */}
+                      <div className="w-16 h-16 rounded-full border border-purple-500/20 animate-spin duration-3000" />
+                      <div className="absolute inset-0 w-16 h-16 rounded-full border border-dashed border-indigo-400/30 animate-reverse-spin duration-1500" />
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <Gem className="w-6 h-6 text-purple-300 animate-pulse" />
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <h4 className="font-display text-sm font-light uppercase tracking-widest text-[#e2e2e7]">
+                        Канал Оплати З’єднується
+                      </h4>
+                      <p className="text-[10px] text-purple-300/55 font-mono tracking-widest uppercase animate-pulse min-h-[14px]">
+                        {paymentPhrases[paymentStep]}
+                      </p>
+                    </div>
+                  </motion.div>
+                ) : paymentSuccess ? (
+                  // PAYMENT SUCCESS SCREEN
+                  <motion.div
+                    key="payment-success"
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    className="py-8 flex flex-col items-center text-center space-y-6"
+                  >
+                    <div className="w-16 h-16 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+                      <CheckCircle className="w-8 h-8" />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <h4 className="font-display text-lg font-light uppercase tracking-wider text-white">
+                        Енергетичну Силу Зараховано!
+                      </h4>
+                      <p className="text-xs text-white/50 max-w-sm leading-relaxed">
+                        На ваш астральний баланс успішно додано <span className="text-emerald-400 font-bold">+{selectedPack?.amount} 💎</span> кристалів. Нехай вони послужать провідником у пізнанні вашої долі.
+                      </p>
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        setShowStoreModal(false);
+                        setPaymentSuccess(false);
+                        setSelectedPack(null);
+                      }}
+                      className="px-6 py-2.5 rounded-xl bg-emerald-500/20 border border-emerald-500/35 hover:bg-emerald-500/35 text-emerald-200 text-[10px] font-display uppercase tracking-widest cursor-pointer transition-all"
+                    >
+                      Чудово ✧
+                    </button>
+                  </motion.div>
+                ) : (
+                  // PACKS SHOWCASE
+                  <motion.div
+                    key="packs-showcase"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="space-y-6"
+                  >
+                    <div className="text-center sm:text-left pr-8">
+                      <h3 className="font-display text-xl font-light text-white uppercase tracking-widest flex items-center justify-center sm:justify-start gap-2">
+                        <Gem className="w-5 h-5 text-purple-400" />
+                        <span>Ефірний Кристальний Фонд</span>
+                      </h3>
+                      <p className="text-xs text-white/40 mt-1 leading-normal font-display">
+                        Придбайте кристалічну силу для миттєвого розблокування психоматриць, кармічних сумісностей та таємних векторних збігів.
+                      </p>
+                    </div>
+
+                    {/* Store Packages Grid */}
+                    <div className="space-y-2.5">
+                      {[
+                        { amount: 50, price: "4.99 USD", label: "Базовий Комплект", discount: "Чистий Сапфір", isHot: false },
+                        { amount: 100, price: "8.99 USD", label: "Економія 10%", discount: "Астральний Резонанс", isHot: false },
+                        { amount: 200, price: "14.99 USD", label: "Економія 25%", discount: "Духовна Зірка", isHot: true },
+                        { amount: 500, price: "29.99 USD", label: "Економія 40%", discount: "Мудрість Жерців", isHot: false },
+                        { amount: 1000, price: "49.99 USD", label: "Економія 50%", discount: "Нескінченна Прана", isHot: false },
+                      ].map((pack) => (
+                        <div
+                          key={pack.amount}
+                          onClick={() => {
+                            setSelectedPack(pack);
+                            setIsProcessingPayment(true);
+                            setPaymentStep(0);
+                            
+                            // Cycle intervals
+                            const interval = setInterval(() => {
+                              setPaymentStep((p) => (p < paymentPhrases.length - 1 ? p + 1 : p));
+                            }, 800);
+
+                            setTimeout(() => {
+                              clearInterval(interval);
+                              setIsProcessingPayment(false);
+                              setPaymentSuccess(true);
+                              setCrystals((prev) => prev + pack.amount);
+                            }, 3200);
+                          }}
+                          className={`group cursor-pointer p-4 rounded-2xl flex items-center justify-between border transition-all duration-300 relative overflow-hidden bg-white/[0.01]/[0.02] ${
+                            pack.isHot
+                              ? "border-purple-500/40 hover:border-purple-500 bg-purple-950/5"
+                              : "border-white/5 hover:border-white/20 hover:bg-white/[0.03]"
+                          }`}
+                        >
+                          {pack.isHot && (
+                            <div className="absolute top-0 right-0 bg-purple-500 text-[8px] font-mono font-bold uppercase tracking-widest text-white px-2.5 py-0.5 rounded-bl-lg">
+                              ПОПУЛЯРНЕ
+                            </div>
+                          )}
+
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-purple-950/35 border border-purple-500/20 flex items-center justify-center shrink-0 text-purple-300">
+                              <Gem className={`w-5 h-5 group-hover:scale-110 transition-transform ${pack.isHot ? "animate-pulse" : ""}`} />
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono text-[#e2e2e7] font-semibold tracking-wider text-sm sm:text-base">
+                                  +{pack.amount} 💎
+                                </span>
+                                <span className="text-[10px] bg-white/5 border border-white/5 text-[#e2e2e7]/70 py-0.5 px-2 rounded-full font-mono text-[9px]">
+                                  {pack.label}
+                                </span>
+                              </div>
+                              <p className="text-[10px] text-white/40 font-display mt-0.5 leading-none">
+                                {pack.discount}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-xs sm:text-sm text-purple-300 group-hover:text-white transition-colors">
+                              {pack.price}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <p className="text-[9px] text-[#e2e2e7]/20 text-center uppercase tracking-widest font-mono">
+                      *Це демонстрація платежу. Плата не вираховується з вашої картки.
+                    </p>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}

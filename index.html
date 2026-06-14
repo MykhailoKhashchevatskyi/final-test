@@ -1,0 +1,301 @@
+import { useState } from "react";
+import { motion, AnimatePresence } from "motion/react";
+import { HelpCircle, RefreshCw, Sparkles, MessageCircleCode, Lock, Gem } from "lucide-react";
+
+interface CoinOfDestinyProps {
+  crystals: number;
+  onUnlockFeature: (featureId: string, cost: number) => boolean;
+  onSaveAction?: (type: "coin" | "compatibility", title: string, details: string) => void;
+}
+
+const COIN_ANSWERS = [
+  {
+    side: "aetheris",
+    title: "AETHERIS • Світлий Шлях",
+    subtitle: "Однозначне так, благословення Всесвіту",
+    desc: "Ваш задум повністю відповідає поточному потоку космічної синергії. Двері відкриті, дійте сміливо та з чистим серцем. Ефірні сили підтримують ваше устремління.",
+    advice: "Не вагайтеся. Це ідеальний час для ініціативи, але пам'ятайте про благородство мотивів.",
+    color: "from-amber-400 via-orange-400 to-yellow-500",
+    badgeColor: "text-amber-400 bg-amber-500/10 border-amber-500/30",
+  },
+  {
+    side: "erebus",
+    title: "EREBUS • Тіньовий Полюс",
+    subtitle: "Тимчасове ні, кармічне застереження",
+    desc: "Космічні вібрації радять утриматися від активних дій. Зараз період внутрішнього накопичення енергії та переосмислення. Спроба форсувати події приведе до кармічного опору.",
+    advice: "Спрямуйте увагу всередину. Запитайте себе, чи не надихає це рішення егоїзмом чи страхом.",
+    color: "from-indigo-500 via-purple-600 to-slate-700",
+    badgeColor: "text-purple-300 bg-purple-500/10 border-purple-500/30",
+  },
+  {
+    side: "karmis",
+    title: "KARMIS • Рівновага Сил",
+    subtitle: "Час нейтралітету та усвідомленого вибору",
+    desc: "Всесвіт не каже ні так, ні ні. Рішення залишене на ваш вільний вибір, оскільки будь-яка стежка принесе важливий життєвий урок. Ви маєте достатньо сили, щоб самотужки виліпити результат.",
+    advice: "Визначте пріоритети. Результат залежатиме виключно від кількості особистої волі, яку ви інвестуєте.",
+    color: "from-emerald-400 via-teal-500 to-indigo-500",
+    badgeColor: "text-[#10b981] bg-emerald-500/10 border-emerald-500/30",
+  },
+  {
+    side: "aetheris",
+    title: "AETHERIS • Сила Творення",
+    subtitle: "Так, через подолання внутрішнього сумніву",
+    desc: "Світлі вібрації переважають, проте вам потрібно відкинути вагання. Всесвіт реагує на вашу внутрішню віру. Щойно ви приймете тверде внутрішнє рішення, обставини складуться якнайкраще.",
+    advice: "Зробіть перший крок сьогодні. Тіні розсіються, щойно ви почнете реальний рух.",
+    color: "from-yellow-400 to-amber-500",
+    badgeColor: "text-amber-300 bg-amber-400/10 border-amber-400/20",
+  },
+  {
+    side: "erebus",
+    title: "EREBUS • Очищення Вогнем",
+    subtitle: "Ні, або повне руйнування старого формату",
+    desc: "Шлях закритий у його нинішньому вигляді. Спроба утримати те, що минає, принесе лише розчарування. Дозвольте старим структурам відійти, щоб звільнити місце для нового циклу.",
+    advice: "Відпустіть контроль. Довіртеся процесу очищення, навіть якщо зараз це відчувається болісно.",
+    color: "from-red-400/80 via-purple-900 to-slate-900",
+    badgeColor: "text-red-400 bg-red-400/10 border-red-500/20",
+  },
+];
+
+export default function CoinOfDestiny({ crystals, onUnlockFeature, onSaveAction }: CoinOfDestinyProps) {
+  const [question, setQuestion] = useState("");
+  const [isFlipping, setIsFlipping] = useState(false);
+  const [currentResult, setCurrentResult] = useState<typeof COIN_ANSWERS[0] | null>(null);
+  const [rotation, setRotation] = useState(0);
+
+  // Deep detailed oracle interpretation unlock state
+  const [isInterpreterUnlocked, setIsInterpreterUnlocked] = useState(false);
+
+  const handleFlip = () => {
+    if (isFlipping) return;
+
+    setIsFlipping(true);
+    setIsInterpreterUnlocked(false); // Reset detailed interpretation on new flip
+
+    // Spin multiple times
+    const extraSpins = 3 * 360; // 3 full spins minimum
+    const isAetherisWin = Math.random() > 0.45;
+    const sideRotation = isAetherisWin ? 0 : 180; // Aetheris is front side (0/360), Erebus is back (180/540)
+    const newRotation = rotation + extraSpins + sideRotation + (180 - (rotation % 180));
+
+    setRotation(newRotation);
+
+    // Smooth scroll down to the coin result anchor
+    setTimeout(() => {
+      document.getElementById("coin-answer-anchor")?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }, 50);
+
+    // Pick random answer corresponding to the side rolled
+    const pool = COIN_ANSWERS.filter((ans) => {
+      if (isAetherisWin) {
+        return ans.side === "aetheris" || ans.side === "karmis";
+      } else {
+        return ans.side === "erebus" || ans.side === "karmis";
+      }
+    });
+    const randomChoice = pool[Math.floor(Math.random() * pool.length)];
+
+    setTimeout(() => {
+      setCurrentResult(randomChoice);
+      setIsFlipping(false);
+      if (onSaveAction) {
+        onSaveAction(
+          "coin",
+          question.trim() ? `Монетка: "${question.trim()}"` : "Монетка без запиту",
+          `Вердикт: ${randomChoice.title.split(" • ")[1] || randomChoice.title} (${randomChoice.subtitle})`
+        );
+      }
+    }, 1500);
+  };
+
+  const unlockDetailedAnalysis = () => {
+    const success = onUnlockFeature("detailed_coin_interpretation_" + Date.now(), 15);
+    if (success) {
+      setIsInterpreterUnlocked(true);
+    }
+  };
+
+  return (
+    <div id="coin-of-destiny-container" className="max-w-4xl mx-auto space-y-6">
+      {/* Introduction Card */}
+      <div className="p-6 sm:p-8 rounded-3xl glass border-white/5 shadow-xl relative overflow-hidden">
+        {/* Abstract elegant decoration */}
+        <div className="absolute top-0 right-0 w-48 h-48 bg-purple-500/5 rounded-full blur-3xl pointer-events-none" />
+
+        <h2 className="font-display text-lg sm:text-xl font-light text-white mb-3 uppercase tracking-[0.2em] flex items-center gap-2">
+          <Sparkles className="w-5 h-5 text-purple-400 animate-pulse" />
+          <span>Монетка Космічної Долі</span>
+        </h2>
+        <p className="text-xs text-white/50 mb-6 leading-relaxed font-light">
+          Маєте дилему чи запитання, яке потребує миттєвого резонансу з ефіром? Сформулюйте його подумки або запишіть у поле, запустіть Монетку Долі та отримайте сакральне скерування.
+        </p>
+
+        {/* Input for visual tracking */}
+        <div className="space-y-4 max-w-xl">
+          <div className="relative font-display">
+            <span className="absolute left-3 top-3.5 text-xs text-white/30 font-light">Запитання:</span>
+            <input
+              type="text"
+              id="destiny-question-input"
+              placeholder="Чи варто мені розпочинати новий проект на цьому тижні?"
+              value={question}
+              onChange={(e) => setQuestion(e.target.value)}
+              disabled={isFlipping}
+              className="w-full bg-white/5 border border-white/10 rounded-2xl p-3 pl-24 text-xs sm:text-sm text-[#e2e2e7] placeholder-white/20 focus:outline-none focus:border-purple-500/40 focus:ring-1 focus:ring-purple-500/20 transition-all"
+            />
+          </div>
+        </div>
+
+        {/* The coin stage */}
+        <div className="flex flex-col items-center justify-center my-10 relative">
+          {/* Constellation background rings */}
+          <div className="absolute w-72 h-72 border border-white/[0.02] rounded-full animate-pulse pointer-events-none" />
+          <div className="absolute w-56 h-56 border border-dashed border-purple-500/5 rounded-full animate-spin duration-30000 pointer-events-none" />
+
+          {/* 3D coin flipping component */}
+          <motion.div
+            style={{ persist: true, perspective: 1000 }}
+            className="w-40 h-40 cursor-pointer select-none"
+            onClick={handleFlip}
+            whileHover={{ scale: isFlipping ? 1 : 1.05 }}
+            whileTap={{ scale: isFlipping ? 1 : 0.95 }}
+          >
+            <motion.div
+              animate={{ rotateY: rotation }}
+              transition={{ duration: 1.5, ease: [0.25, 0.1, 0.25, 1] }}
+              style={{ transformStyle: "preserve-3d" }}
+              className="w-full h-full relative rounded-full"
+            >
+              {/* FRONT SIDE (AETHERIS - Light) */}
+              <div
+                style={{ backfaceVisibility: "hidden" }}
+                className="absolute inset-0 rounded-full border-2 border-amber-400/40 bg-gradient-to-b from-slate-900 via-slate-950 to-slate-900 shadow-2xl flex flex-col items-center justify-center p-4 text-center crystal-glow"
+              >
+                {/* Micro constellation pattern inside */}
+                <span className="text-[10px] uppercase font-mono tracking-[0.25em] text-amber-400/80 mb-1">AETHERIS</span>
+                <div className="w-12 h-12 rounded-full border border-amber-300/20 flex items-center justify-center text-amber-300/80">
+                  <div className="crystal-shape scale-110 shadow-lg shadow-amber-500/20" />
+                </div>
+                <span className="text-[8px] uppercase tracking-widest text-amber-500/40 mt-1.5 font-mono">СВІТЛО</span>
+              </div>
+
+              {/* BACK SIDE (EREBUS - Shadow) */}
+              <div
+                style={{
+                  backfaceVisibility: "hidden",
+                  transform: "rotateY(180deg)",
+                }}
+                className="absolute inset-0 rounded-full border-2 border-indigo-400/30 bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 shadow-2xl flex flex-col items-center justify-center p-4 text-center"
+              >
+                <span className="text-[10px] uppercase font-mono tracking-[0.25em] text-purple-300/80 mb-1">EREBUS</span>
+                <div className="w-12 h-12 rounded-full border border-indigo-500/20 flex items-center justify-center text-indigo-300/70">
+                  <HelpCircle className="w-5 h-5 text-indigo-400/70" />
+                </div>
+                <span className="text-[8px] uppercase tracking-widest text-indigo-400/30 mt-1.5 font-mono">ТІНЬ</span>
+              </div>
+            </motion.div>
+          </motion.div>
+
+          {/* Trigger button */}
+          <button
+            id="flip-coin-btn"
+            onClick={handleFlip}
+            disabled={isFlipping}
+            className={`mt-8 px-6 py-3 rounded-full font-display text-xs tracking-[0.2em] uppercase transition-all duration-300 flex items-center gap-2 cursor-pointer ${
+              isFlipping
+                ? "bg-white/5 border border-white/5 text-white/30 cursor-not-allowed"
+                : "bg-purple-500/20 border border-purple-500/40 text-purple-200 hover:bg-purple-500/30 shadow-lg shadow-purple-500/5 hover:scale-103"
+            }`}
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isFlipping ? "animate-spin" : ""}`} />
+            <span>{isFlipping ? "Визначення Сили..." : "Запустити Монетку Долі"}</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Answer Area Anchor */}
+      <div id="coin-answer-anchor" className="scroll-mt-6" />
+
+      {/* Answer Area */}
+      <AnimatePresence mode="wait">
+        {currentResult && !isFlipping && (
+          <motion.div
+            key={currentResult.title}
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -15 }}
+            className="space-y-6"
+          >
+            {/* Standard Result panel */}
+            <div className="p-6 sm:p-8 rounded-3xl glass border-white/5 shadow-xl relative overflow-hidden">
+              <div className="absolute top-0 left-0 w-32 h-32 bg-purple-500/5 rounded-full blur-2xl pointer-events-none" />
+
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-white/5 pb-4 mb-4">
+                <div>
+                  <span className={`text-[10px] font-mono uppercase tracking-[0.2em] px-2.5 py-1 rounded-full border ${currentResult.badgeColor}`}>
+                    {currentResult.subtitle}
+                  </span>
+                  <h3 className="font-display text-xl font-light text-white uppercase tracking-wider mt-2.5">
+                    {currentResult.title}
+                  </h3>
+                </div>
+                {question && (
+                  <div className="text-right sm:max-w-xs">
+                    <span className="text-[9px] uppercase font-mono text-white/30 tracking-wider">Запит душі</span>
+                    <p className="text-xs text-purple-300 italic font-display mt-1 leading-normal">&ldquo;{question}&rdquo;</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Main short explanation */}
+              <div className="p-5 rounded-2xl bg-white/[0.01] border border-white/5">
+                <p className="text-xs sm:text-sm text-white/80 leading-relaxed font-display font-light">
+                  {currentResult.desc}
+                </p>
+              </div>
+
+              {/* Detailed karmic interpretation block (Unlocks via Crystals) */}
+              {!isInterpreterUnlocked ? (
+                <div className="mt-5 p-6 rounded-2xl bg-amber-500/5 border border-amber-500/10 text-center space-y-3.5">
+                  <div className="w-10 h-10 rounded-full glass border-white/5 mx-auto flex items-center justify-center text-amber-300">
+                    <Lock className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="font-display text-xs text-amber-200 uppercase tracking-widest font-normal">Глибоке сакральне розшифрування закрите</h4>
+                    <p className="text-[11px] text-white/40 max-w-md mx-auto mt-1 leading-normal font-light font-display">
+                      Отримайте розширений оракульний вердикт, інструкції до дії, а також метафізичні поради за кристали сили.
+                    </p>
+                  </div>
+                  <button
+                    id="unlock-coin-interpreter-btn"
+                    onClick={unlockDetailedAnalysis}
+                    className="px-5 py-2 rounded-xl bg-purple-500/20 border border-purple-500/40 text-purple-100 font-semibold text-[10px] tracking-wider uppercase flex items-center gap-1.5 mx-auto cursor-pointer transition-all hover:scale-103"
+                  >
+                    <Gem className="w-3.5 h-3.5 text-purple-300" />
+                    <span>Отримати пораду за 15 💎</span>
+                  </button>
+                </div>
+              ) : (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  className="mt-5 p-5 rounded-2xl bg-purple-500/5 border border-purple-400/20 space-y-3"
+                >
+                  <div className="flex items-center gap-2 text-[10px] text-purple-300 uppercase tracking-widest font-mono">
+                    <MessageCircleCode className="w-4 h-4 text-purple-400 animate-pulse" />
+                    <span>Порада Оракула Aetheris</span>
+                  </div>
+                  <p className="text-xs sm:text-sm text-slate-300 leading-relaxed font-display">
+                    {currentResult.advice}
+                  </p>
+                </motion.div>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}

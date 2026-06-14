@@ -1,0 +1,550 @@
+import React, { useState } from "react";
+import { motion, AnimatePresence } from "motion/react";
+import {
+  User,
+  Lock,
+  Key,
+  LogOut,
+  Sparkles,
+  FileText,
+  Trash2,
+  Calendar,
+  Gem,
+  CheckCircle,
+  HelpCircle,
+  TrendingUp,
+  Heart,
+  Clock,
+} from "lucide-react";
+import { SavedProfile, PredictionItem } from "../types";
+
+interface UserProfileProps {
+  crystals: number;
+  savedProfiles: SavedProfile[];
+  onLoadProfile: (prof: SavedProfile) => void;
+  onDeleteProfile: (id: string) => void;
+  isLoggedIn: boolean;
+  setIsLoggedIn: (val: boolean) => void;
+  predictionsHistory: PredictionItem[];
+  onDeletePrediction: (id: string) => void;
+}
+
+export default function UserProfile({
+  crystals,
+  savedProfiles,
+  onLoadProfile,
+  onDeleteProfile,
+  isLoggedIn,
+  setIsLoggedIn,
+  predictionsHistory = [],
+  onDeletePrediction,
+}: UserProfileProps) {
+  // Login form active view: "login" or "register"
+  const [activeForm, setActiveForm] = useState<"login" | "register">("login");
+  const [activeSubTab, setActiveSubTab] = useState<"profiles" | "predictions">("profiles");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [regUsername, setRegUsername] = useState("");
+  const [regPassword, setRegPassword] = useState("");
+  const [regConfirm, setRegConfirm] = useState("");
+  
+  // Validation errors
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  // Load registered users list from localStorage
+  const getUsersList = (): Record<string, string> => {
+    const cached = localStorage.getItem("aetheris_registered_users");
+    if (cached) return JSON.parse(cached);
+    // Seed default admin account
+    const defaults = { admin: "admin" };
+    localStorage.setItem("aetheris_registered_users", JSON.stringify(defaults));
+    return defaults;
+  };
+
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg(null);
+
+    const user = username.trim().toLowerCase();
+    const pass = password;
+
+    if (!user || !pass) {
+      setErrorMsg("Будь ласка, заповніть всі поля");
+      return;
+    }
+
+    const users = getUsersList();
+    if (users[user] && users[user] === pass) {
+      // Login successful!
+      setIsLoggedIn(true);
+      localStorage.setItem("aetheris_logged_in", "true");
+      localStorage.setItem("aetheris_current_user", user);
+    } else {
+      setErrorMsg("Невірний логін або кармічний пароль");
+    }
+  };
+
+  const handleRegister = (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg(null);
+    setSuccessMsg(null);
+
+    const user = regUsername.trim().toLowerCase();
+    const pass = regPassword;
+    const confirm = regConfirm;
+
+    if (!user || !pass || !confirm) {
+      setErrorMsg("Будь ласка, заповніть всі делікатні поля структури");
+      return;
+    }
+
+    if (pass.length < 4) {
+      setErrorMsg("Пароль повинен бути не менше 4 символів");
+      return;
+    }
+
+    if (pass !== confirm) {
+      setErrorMsg("Паролі в ефірі не збігаються");
+      return;
+    }
+
+    const users = getUsersList();
+    if (users[user]) {
+      setErrorMsg("Цей астральний логін вже зайнятий");
+      return;
+    }
+
+    // Register user
+    users[user] = pass;
+    localStorage.setItem("aetheris_registered_users", JSON.stringify(users));
+    setSuccessMsg("Реєстрація успішна! Тепер увійдіть у свій профіль.");
+    setRegUsername("");
+    setRegPassword("");
+    setRegConfirm("");
+    setActiveForm("login");
+  };
+
+  const handleLogout = () => {
+    setIsLoggedIn(false);
+    localStorage.removeItem("aetheris_logged_in");
+    localStorage.removeItem("aetheris_current_user");
+    setUsername("");
+    setPassword("");
+  };
+
+  const currentUser = localStorage.getItem("aetheris_current_user") || "admin";
+
+  return (
+    <div id="profile-container" className="max-w-4xl mx-auto space-y-6">
+      <AnimatePresence mode="wait">
+        {!isLoggedIn ? (
+          // UNATHENTICATED STATE - BEAUTIFUL LOGIN CARD
+          <motion.div
+            key="auth-card"
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -15 }}
+            className="max-w-md mx-auto p-8 rounded-3xl glass border-white/5 shadow-2xl relative overflow-hidden"
+          >
+            <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/5 rounded-full blur-2xl pointer-events-none" />
+
+            {/* Glowing Icon Header */}
+            <div className="flex flex-col items-center text-center mb-8">
+              <div className="w-14 h-14 rounded-full bg-purple-950/20 border border-purple-500/20 flex items-center justify-center text-purple-300 mb-3 select-none">
+                <Lock className="w-6 h-6 animate-pulse" />
+              </div>
+              <h2 className="font-display text-xl font-light text-white uppercase tracking-widest">
+                Священний Ефірний Вхід
+              </h2>
+              <p className="text-[10px] text-purple-300/40 font-mono uppercase tracking-[0.2em] mt-1.5">
+                Авторизація Сакральної Матриці
+              </p>
+            </div>
+
+            {/* Form selectors */}
+            <div className="grid grid-cols-2 gap-1.5 p-1 rounded-full bg-white/[0.02] border border-white/5 mb-6">
+              <button
+                onClick={() => {
+                  setActiveForm("login");
+                  setErrorMsg(null);
+                  setSuccessMsg(null);
+                }}
+                className={`py-2 rounded-full text-xs font-semibold uppercase tracking-wider transition-all cursor-pointer ${
+                  activeForm === "login"
+                    ? "bg-purple-500/20 border border-purple-500/30 text-purple-200"
+                    : "text-purple-300/40 hover:text-white"
+                }`}
+              >
+                Вхід
+              </button>
+              <button
+                onClick={() => {
+                  setActiveForm("register");
+                  setErrorMsg(null);
+                  setSuccessMsg(null);
+                }}
+                className={`py-2 rounded-full text-xs font-semibold uppercase tracking-wider transition-all cursor-pointer ${
+                  activeForm === "register"
+                    ? "bg-purple-500/20 border border-purple-500/30 text-purple-200"
+                    : "text-purple-300/40 hover:text-white"
+                }`}
+              >
+                Реєстрація
+              </button>
+            </div>
+
+            {/* Status Messages */}
+            {errorMsg && (
+              <motion.div
+                initial={{ opacity: 0, y: -5 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="p-3 mb-4 rounded-xl bg-red-500/10 border border-red-500/20 text-xs text-red-200 text-center"
+              >
+                {errorMsg}
+              </motion.div>
+            )}
+
+            {successMsg && (
+              <motion.div
+                initial={{ opacity: 0, y: -5 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="p-3 mb-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-200 text-center"
+              >
+                {successMsg}
+              </motion.div>
+            )}
+
+            {/* Forms */}
+            {activeForm === "login" ? (
+              <form onSubmit={handleLogin} className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] uppercase tracking-[0.2em] text-white/40 block">Космічний Логін</label>
+                  <div className="relative">
+                    <User className="absolute left-3 top-2.5 w-4 h-4 text-purple-400/40" />
+                    <input
+                      type="text"
+                      id="login-username"
+                      placeholder="Введіть admin..."
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl py-2 pl-10 pr-4 text-xs text-white focus:outline-none focus:ring-1 focus:ring-purple-500/40 font-display"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] uppercase tracking-[0.2em] text-white/40 block">Внутрішній Пароль</label>
+                  <div className="relative">
+                    <Key className="absolute left-3 top-2.5 w-4 h-4 text-purple-400/40" />
+                    <input
+                      type="password"
+                      id="login-password"
+                      placeholder="Введіть admin..."
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl py-2 pl-10 pr-4 text-xs text-white focus:outline-none focus:ring-1 focus:ring-purple-500/40 font-display"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  id="submit-login-btn"
+                  className="w-full mt-6 py-3 rounded-xl bg-gradient-to-r from-purple-500/20 to-indigo-500/20 border border-purple-500/40 hover:bg-gradient-to-r hover:from-purple-500/30 hover:to-indigo-500/30 text-purple-200 text-xs font-display tracking-widest uppercase cursor-pointer transition-all hover:scale-103 shadow-lg"
+                >
+                  Увійти в Ефір
+                </button>
+
+                <p className="text-[9px] text-center text-white/30 tracking-wide mt-4">
+                  *Для тестування використовуйте логін <span className="text-purple-300 font-mono">admin</span> та пароль <span className="text-purple-300 font-mono">admin</span>
+                </p>
+              </form>
+            ) : (
+              <form onSubmit={handleRegister} className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] uppercase tracking-[0.2em] text-white/40 block">Новий Логін</label>
+                  <div className="relative">
+                    <User className="absolute left-3 top-2.5 w-4 h-4 text-purple-400/40" />
+                    <input
+                      type="text"
+                      id="register-username"
+                      placeholder="Адреса вашого духу..."
+                      value={regUsername}
+                      onChange={(e) => setRegUsername(e.target.value)}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl py-2 pl-10 pr-4 text-xs text-white focus:outline-none focus:ring-1 focus:ring-purple-500/40 font-display"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] uppercase tracking-[0.2em] text-white/40 block">Новий Пароль</label>
+                  <div className="relative">
+                    <Key className="absolute left-3 top-2.5 w-4 h-4 text-purple-400/40" />
+                    <input
+                      type="password"
+                      id="register-password"
+                      placeholder="Захисна вібрація..."
+                      value={regPassword}
+                      onChange={(e) => setRegPassword(e.target.value)}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl py-2 pl-10 pr-4 text-xs text-white focus:outline-none focus:ring-1 focus:ring-purple-500/40 font-display"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] uppercase tracking-[0.2em] text-white/40 block">Підтвердити Пароль</label>
+                  <div className="relative">
+                    <Key className="absolute left-3 top-2.5 w-4 h-4 text-purple-400/40" />
+                    <input
+                      type="password"
+                      id="register-confirm-password"
+                      placeholder="Синхронізуйте пароль..."
+                      value={regConfirm}
+                      onChange={(e) => setRegConfirm(e.target.value)}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl py-2 pl-10 pr-4 text-xs text-white focus:outline-none focus:ring-1 focus:ring-purple-500/40 font-display"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  id="submit-register-btn"
+                  className="w-full mt-6 py-3 rounded-xl bg-purple-500/20 border border-purple-500/30 hover:bg-purple-500/35 text-purple-200 text-xs font-display tracking-widest uppercase cursor-pointer transition-all hover:scale-103"
+                >
+                  Створити Профіль
+                </button>
+              </form>
+            )}
+          </motion.div>
+        ) : (
+          // AUTHORIZED STATE - MASTER DASHBOARD & SAVED LISTS
+          <motion.div
+            key="authorized-profile"
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -15 }}
+            className="grid grid-cols-1 md:grid-cols-12 gap-6"
+          >
+            {/* Left Column: Account Summary Card (col-span-5) */}
+            <div className="md:col-span-5 space-y-6">
+              <div className="p-6 rounded-3xl glass border-white/5 shadow-xl relative overflow-hidden flex flex-col justify-between h-full min-h-[385px]">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/5 rounded-full blur-2xl pointer-events-none" />
+
+                <div>
+                  <div className="flex items-center justify-between border-b border-white/5 pb-4 mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-purple-300">
+                        <User className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <span className="text-[8px] font-mono uppercase tracking-[0.2em] text-purple-300/60">Акаунт Магістра</span>
+                        <h3 className="font-display text-base font-semibold text-white capitalize">{currentUser}</h3>
+                      </div>
+                    </div>
+                    <button
+                      id="logout-btn"
+                      onClick={handleLogout}
+                      className="p-2 rounded-xl bg-white/5 border border-white/10 hover:bg-red-500/10 hover:border-red-500/25 text-white/40 hover:text-red-400 transition-all cursor-pointer"
+                      title="Вийти з астралу"
+                    >
+                      <LogOut className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  {/* Spiritual statistics card details */}
+                  <div className="space-y-3">
+                    <div className="p-3 bg-white/[0.01] border border-white/5 rounded-xl flex items-center justify-between">
+                      <span className="text-xs text-white/50 font-display">Ваш Статус:</span>
+                      <span className="text-xs text-amber-300 font-mono tracking-wider font-semibold uppercase flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5" />
+                        <span>Магістр Ефіру II Рівня</span>
+                      </span>
+                    </div>
+
+                    <div className="p-3 bg-white/[0.01] border border-white/5 rounded-xl flex items-center justify-between">
+                      <span className="text-xs text-white/50 font-display">Наявна Сила:</span>
+                      <span className="text-xs text-purple-300 font-mono font-semibold flex items-center gap-1">
+                        <Gem className="w-3.5 h-3.5" />
+                        <span>{crystals} 💎</span>
+                      </span>
+                    </div>
+
+                    <div className="p-3 bg-white/[0.01] border border-white/5 rounded-xl flex items-center justify-between">
+                      <span className="text-xs text-white/50 font-display">Збережених Пророцтв:</span>
+                      <span className="text-xs font-mono font-semibold text-[#e2e2e7]">{savedProfiles.length} осіб</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-6 pt-4 border-t border-white/5">
+                  <div className="p-4 rounded-xl bg-purple-500/5 border border-purple-500/10 text-[11px] text-purple-300/75 font-display leading-relaxed">
+                    <h4 className="font-semibold uppercase tracking-wider text-[10px] text-purple-200 mb-1">Оракульська Сінхронізація</h4>
+                    Ваша астральна лінія з’єднана з ядром Aetheris. Всі розрахунки та прогнози зберігаються у вашій індивідуальній карті для швидкого виклику.
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Right Column: Migrated Saved Profiles & Predictions Directory (col-span-7) */}
+            <div className="md:col-span-7">
+              <div id="saved-profiles-standalone-card" className="p-6 rounded-3xl glass border-white/5 shadow-xl flex flex-col h-full min-h-[420px]">
+                <div className="flex items-center justify-between border-b border-white/5 pb-4 mb-4">
+                  <div className="flex items-center gap-2">
+                    <FileText className="w-5 h-5 text-purple-300 animate-pulse" />
+                    <div>
+                      <h3 className="font-display text-base font-light text-[#e2e2e7] tracking-wider uppercase">Архівні Дані</h3>
+                      <p className="text-[10px] text-purple-300/40 font-sans mt-0.5">
+                        {activeSubTab === "profiles" 
+                          ? "Клацніть на профіль, щоб завантажити його в Карту Життя" 
+                          : "Збережена історія кидків монетки та сакральних сумісностей"}
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-xs font-mono bg-purple-500/15 border border-purple-500/30 text-purple-300/80 px-2.5 py-1 rounded-full">
+                    {activeSubTab === "profiles" ? savedProfiles.length : predictionsHistory.length}
+                  </span>
+                </div>
+
+                {/* Sub-tabs Selector */}
+                <div className="grid grid-cols-2 gap-1.5 p-1 rounded-full bg-white/[0.02] border border-white/5 mb-4 shrink-0">
+                  <button
+                    onClick={() => setActiveSubTab("profiles")}
+                    className={`py-1.5 rounded-full text-xs font-semibold uppercase tracking-wider transition-all cursor-pointer ${
+                      activeSubTab === "profiles"
+                        ? "bg-purple-500/25 border border-purple-500/25 text-purple-200"
+                        : "text-purple-300/40 hover:text-white"
+                    }`}
+                  >
+                    Профілі ({savedProfiles.length})
+                  </button>
+                  <button
+                    onClick={() => setActiveSubTab("predictions")}
+                    className={`py-1.5 rounded-full text-xs font-semibold uppercase tracking-wider transition-all cursor-pointer ${
+                      activeSubTab === "predictions"
+                        ? "bg-purple-500/25 border border-purple-500/25 text-purple-200"
+                        : "text-purple-300/40 hover:text-white"
+                    }`}
+                  >
+                    Історія Прогнозів ({predictionsHistory.length})
+                  </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto space-y-2 max-h-80 pr-1 scrollbar-thin scrollbar-thumb-white/10">
+                  {activeSubTab === "profiles" ? (
+                    savedProfiles.length === 0 ? (
+                      <div className="h-full flex flex-col items-center justify-center py-12 text-center">
+                        <div className="w-12 h-12 rounded-full border border-white/5 flex items-center justify-center text-white/10 mb-3 bg-white/[0.01]">
+                          <HelpCircle className="w-6 h-6" />
+                        </div>
+                        <p className="text-xs text-purple-300/30 font-mono italic">Список порожній.</p>
+                        <p className="text-[10px] text-white/30 max-w-xs mt-1 font-display">
+                          Перейдіть на вкладку "Карта Життя", проведіть розрахунок та натисніть "Зберегти в Сейф", щоб заповнити сейф.
+                        </p>
+                      </div>
+                    ) : (
+                      savedProfiles.map((prof) => (
+                        <div
+                          key={prof.id}
+                          className="p-3.5 rounded-2xl bg-white/[0.02] border border-white/5 hover:border-purple-500/20 flex items-center justify-between group transition-all"
+                        >
+                          <button
+                            onClick={() => onLoadProfile(prof)}
+                            className="flex-1 text-left cursor-pointer flex items-center justify-between"
+                          >
+                            <div>
+                              <p className="text-sm font-medium text-white group-hover:text-purple-300 transition-colors leading-tight font-display">
+                                {prof.name}
+                              </p>
+                              <p className="text-[10px] text-white/40 tracking-wider font-mono mt-1 flex items-center gap-1.5">
+                                <Calendar className="w-3 h-3 text-purple-400/40" />
+                                <span>{prof.birthDate.split("-").reverse().join(".")}</span>
+                              </p>
+                            </div>
+                            
+                            <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1.5 text-xs text-purple-400/60 font-medium">
+                              <span>Завантажити</span>
+                              <TrendingUp className="w-3.5 h-3.5 rotate-45" />
+                            </div>
+                          </button>
+
+                          <button
+                            onClick={() => onDeleteProfile(prof.id)}
+                            className="ml-4 p-2.5 rounded-xl hover:bg-red-500/10 text-white/20 hover:text-red-400 hover:scale-105 cursor-pointer transition-all shrink-0"
+                            title="Видалити профіль"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))
+                    )
+                  ) : (
+                    predictionsHistory.length === 0 ? (
+                      <div className="h-full flex flex-col items-center justify-center py-12 text-center">
+                        <div className="w-12 h-12 rounded-full border border-white/5 flex items-center justify-center text-white/10 mb-3 bg-white/[0.01]">
+                          <Clock className="w-6 h-6" />
+                        </div>
+                        <p className="text-xs text-purple-300/30 font-mono italic">Історія порожня.</p>
+                        <p className="text-[10px] text-white/30 max-w-xs mt-1 font-display">
+                          Спробуйте покрутити Монетку Долі або зробити розрахунок Сумісності, щоб зберегти результати до кармічного реєстру!
+                        </p>
+                      </div>
+                    ) : (
+                      predictionsHistory.map((item) => (
+                        <div
+                          key={item.id}
+                          className="p-3.5 rounded-2xl bg-white/[0.02] border border-white/5 hover:border-purple-500/10 flex items-start justify-between group transition-all"
+                        >
+                          <div className="flex items-start gap-3 flex-1">
+                            {item.type === "coin" ? (
+                              <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center shrink-0 mt-0.5">
+                                <Gem className="w-4 h-4" />
+                              </div>
+                            ) : (
+                              <div className="w-9 h-9 rounded-xl bg-pink-500/10 border border-pink-500/20 text-pink-400 flex items-center justify-center shrink-0 mt-0.5">
+                                <Heart className="w-4 h-4" />
+                              </div>
+                            )}
+
+                            <div className="space-y-1 flex-1">
+                              <p className="text-sm font-medium text-white leading-tight font-display">
+                                {item.title}
+                              </p>
+                              <p className="text-xs text-[#e2e2e7]/70 leading-relaxed font-light font-display">
+                                {item.details}
+                              </p>
+                              <p className="text-[9px] text-white/30 font-mono flex items-center gap-1 pt-0.5">
+                                <Clock className="w-2.5 h-2.5" />
+                                <span>
+                                  {new Date(item.createdAt).toLocaleString("uk-UA", {
+                                    day: "2-digit",
+                                    month: "2-digit",
+                                    year: "numeric",
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  })}
+                                </span>
+                              </p>
+                            </div>
+                          </div>
+
+                          <button
+                            onClick={() => onDeletePrediction(item.id)}
+                            className="ml-4 p-2.5 rounded-xl hover:bg-red-500/10 text-white/20 hover:text-red-400 hover:scale-105 cursor-pointer transition-all shrink-0"
+                            title="Видалити запис"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))
+                    )
+                  )}
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}

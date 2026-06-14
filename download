@@ -1,0 +1,489 @@
+import { useState, useEffect, MouseEvent } from "react";
+import { motion, AnimatePresence } from "motion/react";
+import { Gem, Sparkles, HelpCircle, Flame, Timer, CheckCircle, AlertOctagon, RefreshCw, Eye } from "lucide-react";
+
+interface CrystalSanctuaryProps {
+  crystals: number;
+  onAddCrystals: (amount: number) => void;
+}
+
+// Runic list for the Intuition Game
+interface RuneCard {
+  symbol: string;
+  name: string;
+  meaning: string;
+  isLight: boolean;
+}
+
+const RUNES_POOL = [
+  { symbol: "ᚦ", name: "THURISAZ", meaning: "Космічний Захист", isLight: false },
+  { symbol: "ᚨ", name: "ANSUZ", meaning: "Сакральна Мудрість", isLight: false },
+  { symbol: "ᚲ", name: "KENAZ", meaning: "Внутрішній Вогонь", isLight: false },
+  { symbol: "ᚷ", name: "GEBO", meaning: "Кармічний Дар", isLight: false },
+  { symbol: "ᚹ", name: "WUNJO", meaning: "Ефірна Гармонія", isLight: false },
+  { symbol: "ᛗ", name: "MANNAZ", meaning: "Прихований Потенціал", isLight: false },
+];
+
+export default function CrystalSanctuary({
+  crystals,
+  onAddCrystals,
+}: CrystalSanctuaryProps) {
+  // 1. Crystal Charging Ritual State
+  const [charge, setCharge] = useState(0);
+  const [chargingActive, setChargingActive] = useState(true);
+  const [chargingCooldown, setChargingCooldown] = useState(0); // in seconds
+  const [activeRipples, setActiveRipples] = useState<{ id: number; x: number; y: number }[]>([]);
+
+  // 2. Interactive Rune Intuition Game State (Replacing Old Quiz)
+  const [cards, setCards] = useState<RuneCard[]>([]);
+  const [selectedCardIdx, setSelectedCardIdx] = useState<number | null>(null);
+  const [correctCardIdx, setCorrectCardIdx] = useState<number | null>(null);
+  const [runeRevealed, setRuneRevealed] = useState(false);
+  const [runeGameCooldown, setRuneGameCooldown] = useState(0); // in seconds
+  const [didWinRune, setDidWinRune] = useState<boolean | null>(null);
+
+  // Initialize and check cooldowns on mount
+  useEffect(() => {
+    // A. Check Crystal Charging Cooldown
+    const savedChargingEnd = localStorage.getItem("aetheris_charging_cooldown_end");
+    if (savedChargingEnd) {
+      const remainingMs = parseInt(savedChargingEnd, 10) - Date.now();
+      if (remainingMs > 0) {
+        setChargingCooldown(Math.ceil(remainingMs / 1000));
+        setChargingActive(false);
+      } else {
+        localStorage.removeItem("aetheris_charging_cooldown_end");
+      }
+    }
+
+    // B. Check Rune Game Cooldown
+    const savedRuneEnd = localStorage.getItem("aetheris_rune_cooldown_end");
+    if (savedRuneEnd) {
+      const remainingMs = parseInt(savedRuneEnd, 10) - Date.now();
+      if (remainingMs > 0) {
+        setRuneGameCooldown(Math.ceil(remainingMs / 1000));
+      } else {
+        localStorage.removeItem("aetheris_rune_cooldown_end");
+      }
+    }
+
+    // Initialize Rune Cards
+    generateRuneSetup();
+  }, []);
+
+  // Timers to count down cooldowns
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (chargingCooldown > 0 || runeGameCooldown > 0) {
+      interval = setInterval(() => {
+        // Charging Countdown
+        if (chargingCooldown > 0) {
+          setChargingCooldown((prev) => {
+            if (prev <= 1) {
+              setChargingActive(true);
+              setCharge(0);
+              localStorage.removeItem("aetheris_charging_cooldown_end");
+              return 0;
+            }
+            return prev - 1;
+          });
+        }
+        // Rune Game Countdown
+        if (runeGameCooldown > 0) {
+          setRuneGameCooldown((prev) => {
+            if (prev <= 1) {
+              localStorage.removeItem("aetheris_rune_cooldown_end");
+              return 0;
+            }
+            return prev - 1;
+          });
+        }
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [chargingCooldown, runeGameCooldown]);
+
+  // Charge decay effect (slowly decays over time to keep click speed fun)
+  useEffect(() => {
+    let decayInterval: NodeJS.Timeout;
+    if (charge > 0 && charge < 100 && chargingActive) {
+      decayInterval = setInterval(() => {
+        setCharge((prev) => Math.max(0, prev - 2)); 
+      }, 300);
+    }
+    return () => clearInterval(decayInterval);
+  }, [charge, chargingActive]);
+
+  // Setup the 3 tarot runic cards
+  const generateRuneSetup = () => {
+    // Select 2 random distinct runes from the pool
+    const shuffledPool = [...RUNES_POOL].sort(() => 0.5 - Math.random());
+    const rune1 = shuffledPool[0];
+    const rune2 = shuffledPool[1];
+    
+    // The target Golden Rune is FEHU (ᚠ)
+    const goldenRune: RuneCard = {
+      symbol: "ᚠ",
+      name: "FEHU",
+      meaning: "Священна Руна Світла, Багатства та Проявлення",
+      isLight: true
+    };
+
+    const setList: RuneCard[] = [
+      goldenRune,
+      { symbol: rune1.symbol, name: rune1.name, meaning: rune1.meaning, isLight: false },
+      { symbol: rune2.symbol, name: rune2.name, meaning: rune2.meaning, isLight: false }
+    ];
+
+    // Shuffle the three positions
+    const shuffledSet = setList.sort(() => 0.5 - Math.random());
+    setCards(shuffledSet);
+
+    // Find correct index
+    const correctIdx = shuffledSet.findIndex(r => r.isLight);
+    setCorrectCardIdx(correctIdx);
+
+    // Reset interaction states
+    setSelectedCardIdx(null);
+    setRuneRevealed(false);
+    setDidWinRune(null);
+  };
+
+  // Click on crystal Charging
+  const handleCrystalClick = (e: MouseEvent<HTMLDivElement>) => {
+    if (!chargingActive || chargingCooldown > 0) return;
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    const rippleId = Date.now() + Math.random();
+    setActiveRipples((prev) => [...prev, { id: rippleId, x, y }]);
+    setTimeout(() => {
+      setActiveRipples((prev) => prev.filter((r) => r.id !== rippleId));
+    }, 1000);
+
+    setCharge((prev) => {
+      const next = Math.min(100, prev + 8);
+      if (next >= 100) {
+        // Complete ritual
+        const fourHoursInMs = 4 * 60 * 60 * 1000;
+        const endTime = Date.now() + fourHoursInMs;
+        localStorage.setItem("aetheris_charging_cooldown_end", endTime.toString());
+        setChargingCooldown(4 * 60 * 60);
+        setChargingActive(false);
+        onAddCrystals(1); // yields precisely +1 crystal
+      }
+      return next;
+    });
+  };
+
+  // Play Rune Intuition Match
+  const selectRuneCard = (index: number) => {
+    if (runeRevealed || runeGameCooldown > 0) return;
+
+    setSelectedCardIdx(index);
+    setRuneRevealed(true);
+
+    const chosenCard = cards[index];
+    if (chosenCard.isLight) {
+      // Won! Give 10 crystals, 1 hour cooldown on success
+      setDidWinRune(true);
+      onAddCrystals(10);
+      const oneHourInMs = 1 * 60 * 60 * 1000;
+      const endTime = Date.now() + oneHourInMs;
+      localStorage.setItem("aetheris_rune_cooldown_end", endTime.toString());
+      setRuneGameCooldown(1 * 60 * 60);
+    } else {
+      // Failed. No reward, short 2-minute practice cooldown
+      setDidWinRune(false);
+      const twoMinutesInMs = 2 * 60 * 1000;
+      const endTime = Date.now() + twoMinutesInMs;
+      localStorage.setItem("aetheris_rune_cooldown_end", endTime.toString());
+      setRuneGameCooldown(2 * 60);
+    }
+  };
+
+  // Formatting seconds into clean Hour/Minute/Second string for expensive look
+  const formatTime = (seconds: number) => {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+    
+    const parts = [];
+    if (h > 0) parts.push(`${h}г`);
+    if (m > 0 || h > 0) parts.push(`${m}хв`);
+    parts.push(`${s}с`);
+    return parts.join(" ");
+  };
+
+  return (
+    <div id="sanctuary-grid-layout" className="grid grid-cols-1 md:grid-cols-12 gap-6 max-w-5xl mx-auto">
+      
+      {/* LEFT COLUMN: Crystal Charging Ritual (Col Span 6) */}
+      <div className="md:col-span-6 flex flex-col">
+        <div id="crystal-charging-box" className="p-6 rounded-3xl glass border-white/5 backdrop-blur-md relative overflow-hidden flex flex-col justify-between flex-1 min-h-[460px] shadow-xl">
+          {/* Subtle light effect */}
+          <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/5 rounded-full blur-2xl pointer-events-none" />
+
+          <div>
+            <h2 className="text-base font-display font-light text-white uppercase tracking-[0.2em] mb-1 flex items-center gap-2">
+              <Flame className="w-5 h-5 text-purple-400 animate-pulse animate-duration-10000" />
+              <span>Ритуал Зарядки Кристалу</span>
+            </h2>
+            <p className="text-xs text-white/50 mb-6 leading-relaxed font-light">
+              Натискайте на кристалічний вузол, щоб зарядити його праною до 100%. Успішна зарядка принесе вам додатковий кристал сили!
+            </p>
+          </div>
+
+          {/* Interactive clicking area */}
+          <div className="relative flex items-center justify-center py-8 flex-1 w-full">
+            {chargingCooldown > 0 ? (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="text-center space-y-4 z-10"
+              >
+                <div className="w-20 h-20 rounded-full bg-purple-900/10 border border-purple-500/20 flex items-center justify-center mx-auto text-purple-300">
+                  <Timer className="w-8 h-8 animate-pulse" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-display font-light text-[#e2e2e7] tracking-wider uppercase">Кристал Заряджено</h4>
+                  <p className="text-[11px] text-purple-300/60 font-mono tracking-widest mt-1">Оновлення через: {formatTime(chargingCooldown)}</p>
+                </div>
+                <div className="w-48 h-1 bg-white/5 rounded-full overflow-hidden mx-auto">
+                  <div
+                    style={{ width: `${(chargingCooldown / 14400) * 100}%` }}
+                    className="h-full bg-gradient-to-r from-purple-500 to-indigo-400 transition-all duration-1000"
+                  />
+                </div>
+              </motion.div>
+            ) : (
+              <div
+                id="interactive-gem-node"
+                onClick={handleCrystalClick}
+                className="relative cursor-pointer select-none group w-48 h-48 flex items-center justify-center p-4 border border-white/5 rounded-full bg-white/[0.01] hover:bg-white/[0.03] hover:border-purple-500/20 transition-all duration-300"
+                title="Пришвидшено натискайте для акумуляції"
+              >
+                {/* Clicking Ripples */}
+                {activeRipples.map((ripple) => (
+                  <motion.span
+                    key={ripple.id}
+                    initial={{ opacity: 0.8, scale: 0 }}
+                    animate={{ opacity: 0, scale: 2.5 }}
+                    className="absolute rounded-full border border-purple-400 bg-purple-500/5 pointer-events-none w-12 h-12"
+                    style={{ left: ripple.x - 24, top: ripple.y - 24 }}
+                  />
+                ))}
+
+                {/* Pulsing rings based on charge level */}
+                <div
+                  style={{ transform: `scale(${1 + charge / 250})` }}
+                  className="absolute inset-2 rounded-full border border-dashed border-purple-500/10 animate-spin duration-30000"
+                />
+                <div
+                  style={{ transform: `scale(${1.1 + charge / 200})` }}
+                  className="absolute inset-0 rounded-full border border-indigo-400/5 animate-reverse-spin duration-15000"
+                />
+
+                {/* Glass core glow */}
+                <div className="absolute w-32 h-32 rounded-full bg-purple-500/5 blur-xl group-hover:bg-purple-500/10 transition-all" />
+
+                {/* Main animated Gem vector icon */}
+                <motion.div
+                  animate={charge > 0 ? {
+                    y: [0, -4, 0],
+                    scale: [1, 1.04 + charge / 400, 1],
+                  } : {
+                    y: [0, -8, 0],
+                  }}
+                  transition={{
+                    repeat: Infinity,
+                    duration: charge > 0 ? 0.35 : 3.5,
+                    ease: "easeInOut",
+                  }}
+                  className="relative z-10"
+                >
+                  <Gem
+                    style={{
+                      color: `rgb(${160 + charge}, ${100 + charge / 2}, 247)`,
+                      filter: `drop-shadow(0 0 ${6 + (charge / 4)}px rgba(168,85,247,0.4))`,
+                    }}
+                    className="w-24 h-24 stroke-[1] transition-all"
+                  />
+                  <Sparkles className="w-5 h-5 absolute top-0 -right-1 text-amber-300 animate-pulse" />
+                </motion.div>
+              </div>
+            )}
+          </div>
+
+          {/* Progress bar and statistics */}
+          {chargingCooldown <= 0 && (
+            <div className="space-y-3 mt-4">
+              <div className="flex items-center justify-between font-mono text-[10px] text-purple-300/60 uppercase tracking-widest">
+                <span>Рівень Акумуляції: {charge}%</span>
+                <span className="animate-pulse tracking-normal">
+                  {charge >= 85 ? "МАКСИМАЛЬНИЙ РЕЗОНАНС! 🔥" : charge >= 45 ? "АКУМУЛЯЦІЯ..." : "ШВИДКО КЛІКАЙТЕ"}
+                </span>
+              </div>
+              <div className="w-full h-3 rounded-full bg-slate-950 border border-white/5 overflow-hidden p-0.5">
+                <motion.div
+                  style={{ width: `${charge}%` }}
+                  className="h-full bg-gradient-to-r from-purple-500 via-indigo-400 to-purple-300 rounded-full"
+                />
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* RIGHT COLUMN: Interactive Rune Intuition Game (Col Span 6) */}
+      <div className="md:col-span-6 flex flex-col">
+        <div id="rune-intuition-box" className="p-6 rounded-3xl glass border-white/5 backdrop-blur-md flex flex-col justify-between flex-1 shadow-xl relative overflow-hidden">
+          {/* Subtle light effect */}
+          <div className="absolute bottom-0 left-0 w-32 h-32 bg-indigo-500/5 rounded-full blur-2xl pointer-events-none" />
+
+          <div>
+            <h2 className="text-base font-display font-light text-white uppercase tracking-[0.2em] mb-1 flex items-center gap-2">
+              <Eye className="w-5 h-5 text-amber-400 animate-pulse" />
+              <span>Інтуїтивний Тест Рун</span>
+            </h2>
+            <p className="text-xs text-white/50 mb-6 leading-relaxed font-light font-display">
+              Всесвіт зашифрував священну Золоту Руну Світла <span className="text-amber-300 font-bold">FEHU (ᚠ)</span> під однією з трьох карт. Налаштуйте свій ефірний зір і зробіть вибір!
+            </p>
+          </div>
+
+          <div className="space-y-6 my-auto pt-4 pb-2">
+            {/* The Cards Interactive Table */}
+            <div className="grid grid-cols-3 gap-3 justify-center items-center">
+              {cards.map((card, idx) => {
+                const isSelected = selectedCardIdx === idx;
+                const isCorrect = card.isLight;
+                
+                return (
+                  <div
+                    key={idx}
+                    style={{ perspective: "1000px" }}
+                    onClick={() => selectRuneCard(idx)}
+                    className={`w-full aspect-[2/3] relative cursor-pointer select-none rounded-2xl transition-all duration-500 ${
+                      runeRevealed ? "pointer-events-none" : "hover:scale-105 active:scale-95"
+                    }`}
+                  >
+                    <motion.div
+                      animate={{ rotateY: runeRevealed ? 180 : 0 }}
+                      transition={{ duration: 0.6, ease: "easeInOut" }}
+                      style={{ transformStyle: "preserve-3d" }}
+                      className="w-full h-full relative"
+                    >
+                      {/* CARD FRONT - Face Down Cover */}
+                      <div
+                        style={{ backfaceVisibility: "hidden" }}
+                        className={`absolute inset-0 rounded-2xl border flex flex-col items-center justify-center p-2 bg-gradient-to-b from-[#111116] to-[#08080b] shadow-lg transition-colors ${
+                          runeGameCooldown > 0
+                            ? "border-white/5 opacity-50"
+                            : "border-purple-500/20 hover:border-purple-500/40"
+                        }`}
+                      >
+                        <div className="w-6 h-6 rounded-full border border-purple-500/10 flex items-center justify-center mb-1 bg-black/40">
+                          <HelpCircle className="w-3.5 h-3.5 text-purple-400/40" />
+                        </div>
+                        <span className="text-[7px] font-mono tracking-widest text-purple-300/30 uppercase">AETHERIS</span>
+                      </div>
+
+                      {/* CARD BACK - Revealed Rune */}
+                      <div
+                        style={{
+                          backfaceVisibility: "hidden",
+                          transform: "rotateY(180deg)",
+                        }}
+                        className={`absolute inset-0 rounded-2xl border flex flex-col items-center justify-center p-3 text-center bg-gradient-to-b ${
+                          isCorrect
+                            ? "border-amber-400/40 bg-amber-500/5"
+                            : isSelected
+                            ? "border-red-500/30 bg-red-500/5"
+                            : "border-white/5 bg-[#111116]/80"
+                        }`}
+                      >
+                        <span
+                          className={`text-3xl font-bold font-mono mb-2 block ${
+                            isCorrect ? "text-amber-400 drop-shadow-[0_0_10px_rgba(245,158,11,0.4)]" : "text-white/40"
+                          }`}
+                        >
+                          {card.symbol}
+                        </span>
+                        <span className="text-[8px] font-mono font-semibold text-white/80 uppercase tracking-widest mb-1 truncate block max-w-full">
+                          {card.name}
+                        </span>
+                        <p className="text-[8px] text-white/40 leading-tight font-display font-light line-clamp-2">
+                          {card.meaning}
+                        </p>
+                      </div>
+                    </motion.div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Verdict of Intuition */}
+            <AnimatePresence mode="wait">
+              {runeRevealed && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="p-4 rounded-2xl bg-white/[0.01] border border-white/5 space-y-3"
+                >
+                  <div className="flex items-center gap-2">
+                    {didWinRune ? (
+                      <div className="text-amber-400 font-display text-xs font-normal flex items-center gap-1.5 uppercase tracking-wider">
+                        <CheckCircle className="w-4 h-4 text-amber-500" />
+                        <span>Вітаємо! Інтуїція вас не зрадила ✧ (+10 💎)</span>
+                      </div>
+                    ) : (
+                      <div className="text-red-400/80 font-display text-xs font-normal flex items-center gap-1.5 uppercase tracking-wider">
+                        <AlertOctagon className="w-4 h-4 text-red-500" />
+                        <span>Магнітне поле нейтралізовано</span>
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-white/60 leading-normal font-display font-light">
+                    {didWinRune
+                      ? "Ви обрали священну Руну FEHU (ᚠ). Ваш розум та підсвідомість знаходяться в синхроністичному зв’язку з астральними кристалічними вібраціями нашої ефірної системи. Дарунок сили зараховано."
+                      : "Цього разу ви обрали іншу руну (руна Fehu була під картою №" + (correctCardIdx !== null ? correctCardIdx + 1 : "?") + "). Ваша енергія потребує хвилинного відпочинку, щоб налаштувати внутрішній камертон. Практикуйте частіше, щоб чути голос космосу."}
+                  </p>
+
+                  <div className="flex gap-2">
+                    {runeGameCooldown > 0 ? (
+                      <div className="text-[10px] font-mono text-purple-300/40 uppercase tracking-widest py-2">
+                        Очікування: {formatTime(runeGameCooldown)}
+                      </div>
+                    ) : (
+                      <button
+                        id="reset-rune-test-btn"
+                        onClick={generateRuneSetup}
+                        className="w-full py-2.5 rounded-xl bg-purple-500/10 border border-purple-500/30 text-purple-200 text-[10px] font-display uppercase tracking-widest cursor-pointer hover:bg-purple-500/20 transition-all font-medium"
+                      >
+                        Спробувати Ще Раз
+                      </button>
+                    )}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {runeGameCooldown > 0 && !runeRevealed && (
+              <div className="p-4 rounded-xl bg-purple-950/10 border border-purple-950/30 text-center">
+                <p className="text-[11px] text-purple-300/50 font-display font-light leading-normal">
+                  Ваші енергетичні канали закрилися для накопичення сили. Спробуйте наступний інтуїтивний сеанс через:
+                </p>
+                <span className="text-xs font-mono text-purple-300 font-bold block mt-1 tracking-widest">
+                  {formatTime(runeGameCooldown)}
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
